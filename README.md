@@ -34,14 +34,14 @@ To download the application you can clone the repository:
  git clone https://github.com/couchbaselabs/try-cb-golang.git
  ```
 
- 4. Start the application.  From a terminal:
+Start the application.  From a terminal:
 
  ```bash
- cd src/github.com/couchbaselabs/try-cb-golang/
+ cd try-cb-golang/
  go run main.go
  ```
 
- 5. Open a browser and load the url http://localhost:8080
+ Open a browser and load the url http://localhost:8080
 
 ## REST API DOCUMENTATION
 The REST API for this example application can be found at:
