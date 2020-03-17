@@ -144,7 +144,7 @@ func decodeAuthUserOrFail(w http.ResponseWriter, req *http.Request, user *Authed
 	token, err := jwt.Parse(authToken, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 
 		return jwtSecret, nil
@@ -380,7 +380,7 @@ func UserLogin(w http.ResponseWriter, req *http.Request) {
 	encodeRespOrFail(w, respData)
 }
 
-//POST /api/user/signup
+// POST /api/user/signup
 type jsonUserSignupReq struct {
 	User     string `json:"user"`
 	Password string `json:"password"`
@@ -450,14 +450,18 @@ func UserFlights(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res.Content(&user)
+	err = res.Content(&user)
+	if err != nil {
+		writeJsonFailure(w, 500, err)
+		return
+	}
 
 	respData.Data = user.Flights
 
 	encodeRespOrFail(w, respData)
 }
 
-//POST  /api/user/{username}/flights
+// POST  /api/user/{username}/flights
 type jsonUserBookFlightReq struct {
 	Flights []jsonBookedFlight `json:"flights"`
 }
@@ -490,7 +494,11 @@ func UserBookFlight(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	cas := res.Cas()
-	res.Content(&user)
+	err = res.Content(&user)
+	if err != nil {
+		writeJsonFailure(w, 500, err)
+		return
+	}
 
 	for _, flight := range reqData.Flights {
 		flight.BookedOn = time.Now().Format("01/02/2006")
@@ -550,7 +558,7 @@ func HotelSearch(w http.ResponseWriter, req *http.Request) {
 	respData.Data = []jsonHotel{}
 	for results.Next() {
 		hit := results.Row()
-		res, _ := globalCollection.LookupIn(hit.ID, []gocb.LookupInSpec{
+		res, err := globalCollection.LookupIn(hit.ID, []gocb.LookupInSpec{
 			gocb.GetSpec("country", nil),
 			gocb.GetSpec("city", nil),
 			gocb.GetSpec("state", nil),
@@ -558,16 +566,50 @@ func HotelSearch(w http.ResponseWriter, req *http.Request) {
 			gocb.GetSpec("name", nil),
 			gocb.GetSpec("description", nil),
 		}, nil)
-		// We ignore errors here since some hotels are missing various
-		//  pieces of data, but every key exists since it came from FTS.
+		if err != nil {
+			writeJsonFailure(w, 500, err)
+			return
+		}
+		// We only log errors here because being unable to retrieve one of the hotel fields isn't fatal to
+		// our request.
 
 		var hotel jsonHotel
-		res.ContentAt(0, &hotel.Country)
-		res.ContentAt(1, &hotel.City)
-		res.ContentAt(2, &hotel.State)
-		res.ContentAt(3, &hotel.Address)
-		res.ContentAt(4, &hotel.Name)
-		res.ContentAt(5, &hotel.Description)
+		if res.Exists(0) {
+			err = res.ContentAt(0, &hotel.Country)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+		if res.Exists(1) {
+			err = res.ContentAt(1, &hotel.City)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+		if res.Exists(2) {
+			err = res.ContentAt(2, &hotel.State)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+		if res.Exists(3) {
+			err = res.ContentAt(3, &hotel.Address)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+		if res.Exists(4) {
+			err = res.ContentAt(4, &hotel.Name)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+		if res.Exists(5) {
+			err = res.ContentAt(5, &hotel.Description)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
 		respData.Data = append(respData.Data, hotel)
 	}
 
@@ -585,8 +627,8 @@ func main() {
 	// Connect to Couchbase
 	clusterOpts := gocb.ClusterOptions{
 		Authenticator: gocb.PasswordAuthenticator{
-			cbUsername,
-			cbPassword,
+			Username: cbUsername,
+			Password: cbPassword,
 		},
 	}
 	globalCluster, err = gocb.Connect(cbConnStr, clusterOpts)
